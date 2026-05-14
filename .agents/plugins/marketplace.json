@@ -1,0 +1,21 @@
+{
+  "name": "claude-bridge",
+  "interface": {
+    "displayName": "Claude Bridge for Codex",
+    "shortDescription": "Use Claude from Codex for code reviews or to delegate tasks."
+  },
+  "plugins": [
+    {
+      "name": "claude",
+      "source": {
+        "source": "local",
+        "path": "./plugins/claude"
+      },
+      "policy": {
+        "installation": "INSTALLED_BY_DEFAULT",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "AI"
+    }
+  ]
+}

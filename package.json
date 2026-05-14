@@ -1,0 +1,14 @@
+{
+  "name": "codex-plugin-claude",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Use Claude from Codex to review code or delegate tasks.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18.18"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.mjs"
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "name": "claude",
+  "version": "0.1.0",
+  "description": "Claude bridge for Codex.\n\nAliases: @claude, claude, Claude, Anthropic Claude.\n\nUse Claude when the user asks to delegate a coding task, code review, debugging investigation, or long-running implementation work to Anthropic's Claude model. Routes through the local `claude` CLI on the same machine.\n\nFor requests like \"have Claude review this\", \"ask Claude to fix the failing test\", \"get a second opinion from Claude\", \"is Claude up?\", or \"check Claude\", invoke the matching skill in this plugin (claude-setup, claude-review, claude-rescue, claude-status, claude-result, claude-cancel, claude-adversarial-review).\n\nDo not satisfy explicit Claude requests by writing your own `claude --version`, `claude -p ...` shell commands, or by attempting the task with Codex itself unless the user approves a fallback.",
+  "author": {
+    "name": "preyam2002"
+  },
+  "homepage": "https://github.com/preyam2002/codex-plugin-claude",
+  "repository": "https://github.com/preyam2002/codex-plugin-claude",
+  "license": "MIT",
+  "keywords": [
+    "claude",
+    "anthropic",
+    "code-review",
+    "delegation",
+    "rescue",
+    "multi-model"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Claude",
+    "shortDescription": "Delegate reviews and tasks to Claude from inside Codex",
+    "longDescription": "Claude lets Codex hand off code reviews, debugging investigations, and substantial coding tasks to Anthropic's Claude model via the local `claude` CLI. Includes background job tracking, resume support, and an adversarial-review mode for pre-ship pressure testing.",
+    "developerName": "preyam2002",
+    "category": "Engineering",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Have Claude review my uncommitted changes",
+      "Ask Claude to investigate why the tests are failing",
+      "Run an adversarial Claude review against main"
+    ]
+  }
+}
