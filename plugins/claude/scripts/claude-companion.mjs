@@ -281,6 +281,11 @@ async function executeReviewRun(request) {
   const result = await runClaudeTurn(context.repoRoot, {
     prompt,
     model: request.model,
+    effort: request.effort,
+    maxBudgetUsd: request.maxBudgetUsd,
+    forkSession: request.forkSession,
+    allowedTools: request.allowedTools,
+    disallowedTools: request.disallowedTools,
     sandbox: "read-only",
     onProgress: request.onProgress
   });
@@ -293,7 +298,8 @@ async function executeReviewRun(request) {
       review: reviewName,
       target,
       threadId: result.threadId,
-      claude: { status: result.status, stderr: result.stderr, stdout: result.finalMessage, reasoning: result.reasoningSummary },
+      telemetry: result.telemetry,
+      claude: { status: result.status, stderr: result.stderr, stdout: result.finalMessage },
       result: parsed.parsed,
       rawOutput: parsed.rawOutput,
       parseError: parsed.parseError
@@ -301,9 +307,13 @@ async function executeReviewRun(request) {
     return {
       exitStatus: result.status,
       threadId: result.threadId,
-      turnId: result.turnId,
+      telemetry: result.telemetry,
       payload,
-      rendered: renderReviewResult(parsed, { reviewLabel: reviewName, targetLabel: target.label, reasoningSummary: result.reasoningSummary }),
+      rendered: renderReviewResult(parsed, {
+        reviewLabel: reviewName,
+        targetLabel: target.label,
+        telemetry: result.telemetry
+      }),
       summary: parsed.parsed?.summary ?? parsed.parseError ?? firstMeaningfulLine(result.finalMessage, `${reviewName} finished.`),
       jobTitle: `Claude ${reviewName}`,
       jobClass: "review",
@@ -315,16 +325,17 @@ async function executeReviewRun(request) {
     review: reviewName,
     target,
     threadId: result.threadId,
-    claude: { status: result.status, stderr: result.stderr, stdout: result.finalMessage, reasoning: result.reasoningSummary }
+    telemetry: result.telemetry,
+    claude: { status: result.status, stderr: result.stderr, stdout: result.finalMessage }
   };
   return {
     exitStatus: result.status,
     threadId: result.threadId,
-    turnId: result.turnId,
+    telemetry: result.telemetry,
     payload,
     rendered: renderNativeReviewResult(
       { status: result.status, stdout: result.finalMessage, stderr: result.stderr },
-      { reviewLabel: reviewName, targetLabel: target.label, reasoningSummary: result.reasoningSummary }
+      { reviewLabel: reviewName, targetLabel: target.label, telemetry: result.telemetry }
     ),
     summary: firstMeaningfulLine(result.finalMessage, `${reviewName} completed.`),
     jobTitle: `Claude ${reviewName}`,
@@ -356,27 +367,36 @@ async function executeTaskRun(request) {
     prompt: request.prompt,
     defaultPrompt: resumeThreadId ? DEFAULT_CONTINUE_PROMPT : "",
     model: request.model,
+    effort: request.effort,
+    maxBudgetUsd: request.maxBudgetUsd,
+    forkSession: request.forkSession,
+    allowedTools: request.allowedTools,
+    disallowedTools: request.disallowedTools,
     sandbox: request.write ? "workspace-write" : "read-only",
     onProgress: request.onProgress
   });
 
   const rawOutput = typeof result.finalMessage === "string" ? result.finalMessage : "";
-  const failureMessage = result.error?.message ?? result.stderr ?? "";
+  const failureMessage =
+    result.error?.message ??
+    result.telemetry?.apiErrorStatus ??
+    (result.telemetry?.isError ? "Claude reported an error (see telemetry)." : null) ??
+    result.stderr ??
+    "";
   const rendered = renderTaskResult(
-    { rawOutput, failureMessage, reasoningSummary: result.reasoningSummary },
+    { rawOutput, failureMessage, telemetry: result.telemetry },
     { title: taskMetadata.title, jobId: request.jobId ?? null, write: Boolean(request.write) }
   );
   const payload = {
     status: result.status,
     threadId: result.threadId,
     rawOutput,
-    touchedFiles: result.touchedFiles,
-    reasoningSummary: result.reasoningSummary
+    telemetry: result.telemetry
   };
   return {
     exitStatus: result.status,
     threadId: result.threadId,
-    turnId: result.turnId,
+    telemetry: result.telemetry,
     payload,
     rendered,
     summary: firstMeaningfulLine(rawOutput, firstMeaningfulLine(failureMessage, `${taskMetadata.title} finished.`)),
@@ -446,8 +466,32 @@ function buildTaskJob(workspaceRoot, taskMetadata, write) {
   });
 }
 
-function buildTaskRequest({ cwd, model, prompt, write, resumeLast, jobId }) {
-  return { cwd, model, prompt, write, resumeLast, jobId };
+function buildTaskRequest({
+  cwd,
+  model,
+  effort,
+  maxBudgetUsd,
+  forkSession,
+  allowedTools,
+  disallowedTools,
+  prompt,
+  write,
+  resumeLast,
+  jobId
+}) {
+  return {
+    cwd,
+    model,
+    effort,
+    maxBudgetUsd,
+    forkSession,
+    allowedTools,
+    disallowedTools,
+    prompt,
+    write,
+    resumeLast,
+    jobId
+  };
 }
 
 function readTaskPrompt(cwd, options, positionals) {
@@ -504,8 +548,17 @@ function enqueueBackgroundTask(cwd, job, request) {
 
 async function handleReviewCommand(argv, config) {
   const { options, positionals } = parseCommandInput(argv, {
-    valueOptions: ["base", "scope", "model", "cwd"],
-    booleanOptions: ["json", "background", "wait"],
+    valueOptions: [
+      "base",
+      "scope",
+      "model",
+      "cwd",
+      "effort",
+      "max-budget-usd",
+      "allowed-tools",
+      "disallowed-tools"
+    ],
+    booleanOptions: ["json", "background", "wait", "fork-session"],
     aliasMap: { m: "model" }
   });
 
@@ -530,6 +583,11 @@ async function handleReviewCommand(argv, config) {
         base: options.base,
         scope: options.scope,
         model: options.model,
+        effort: options.effort,
+        maxBudgetUsd: options["max-budget-usd"],
+        forkSession: Boolean(options["fork-session"]),
+        allowedTools: options["allowed-tools"],
+        disallowedTools: options["disallowed-tools"],
         focusText,
         reviewName: config.reviewName,
         onProgress: progress
@@ -544,8 +602,24 @@ async function handleReview(argv) {
 
 async function handleTask(argv) {
   const { options, positionals } = parseCommandInput(argv, {
-    valueOptions: ["model", "cwd", "prompt-file"],
-    booleanOptions: ["json", "write", "resume-last", "resume", "fresh", "background"],
+    valueOptions: [
+      "model",
+      "cwd",
+      "prompt-file",
+      "effort",
+      "max-budget-usd",
+      "allowed-tools",
+      "disallowed-tools"
+    ],
+    booleanOptions: [
+      "json",
+      "write",
+      "resume-last",
+      "resume",
+      "fresh",
+      "background",
+      "fork-session"
+    ],
     aliasMap: { m: "model" }
   });
 
@@ -558,13 +632,29 @@ async function handleTask(argv) {
   const write = Boolean(options.write);
   const taskMetadata = buildTaskRunMetadata({ prompt, resumeLast });
 
+  const sharedRequestBase = {
+    model: options.model,
+    effort: options.effort,
+    maxBudgetUsd: options["max-budget-usd"],
+    forkSession: Boolean(options["fork-session"]),
+    allowedTools: options["allowed-tools"],
+    disallowedTools: options["disallowed-tools"]
+  };
+
   if (options.background) {
     ensureClaudeAvailable(cwd);
     if (!prompt && !resumeLast) {
       throw new Error("Provide a prompt, a prompt file, piped stdin, or use --resume-last.");
     }
     const job = buildTaskJob(workspaceRoot, taskMetadata, write);
-    const request = buildTaskRequest({ cwd, model: options.model, prompt, write, resumeLast, jobId: job.id });
+    const request = buildTaskRequest({
+      cwd,
+      ...sharedRequestBase,
+      prompt,
+      write,
+      resumeLast,
+      jobId: job.id
+    });
     const { payload } = enqueueBackgroundTask(cwd, job, request);
     outputCommandResult(payload, renderQueuedTaskLaunch(payload), options.json);
     return;
@@ -576,7 +666,7 @@ async function handleTask(argv) {
     (progress) =>
       executeTaskRun({
         cwd,
-        model: options.model,
+        ...sharedRequestBase,
         prompt,
         write,
         resumeLast,

@@ -65,6 +65,26 @@ Codex plugins do not register custom slash commands. Invoke this plugin's skills
 
 You can also pass standard flags inside the natural-language request — the skills strip them out before forwarding to the companion script. For example: "ask Claude to fix the failing test in the background", "have Claude review against main", "resume the last Claude task with --model claude-haiku-4-5".
 
+Supported flags (foreground task / review):
+
+| Flag | Meaning |
+| --- | --- |
+| `--model <name>` | `sonnet`, `opus`, `claude-sonnet-4-6`, etc. |
+| `--effort <level>` | `low` / `medium` / `high` / `xhigh` / `max` |
+| `--max-budget-usd <amount>` | hard dollar cap for the invocation |
+| `--fork-session` | with `--resume`, branch into a new session id instead of overwriting |
+| `--allowed-tools <list>` / `--disallowed-tools <list>` | comma-separated tool gating (e.g. `Bash,Edit`) |
+| `--background` / `--wait` | run detached, then poll with status/result |
+| `--write` / `--read-only` | sandbox mode (read-only maps to Claude's `plan` permission) |
+
+Each completed task prints a telemetry footer:
+
+```
+_duration 2.1s · cost $0.1980 · tokens in/out 6/7 · model claude-opus-4-7_
+```
+
+Foreground runs stream live progress to stderr as Claude works (one line per assistant message / tool use), so you no longer sit on a silent prompt for 30+ seconds.
+
 ## How it works
 
 The plugin wraps the `claude` CLI in `--print` mode and tracks each invocation as a job under `${CODEX_PLUGIN_DATA}/state/<workspace>/`. Background tasks spawn a detached `node` worker that runs the same companion script with `task-worker --job-id <id>`.

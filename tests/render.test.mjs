@@ -9,7 +9,8 @@ import {
   renderSetupReport,
   renderStatusReport,
   renderStoredJobResult,
-  renderTaskResult
+  renderTaskResult,
+  renderTelemetryFooter
 } from "../plugins/claude/scripts/lib/render.mjs";
 
 test("renderSetupReport summarises readiness and next steps", () => {
@@ -29,12 +30,52 @@ test("renderSetupReport summarises readiness and next steps", () => {
 
 test("renderTaskResult surfaces output and write flag", () => {
   const out = renderTaskResult(
-    { rawOutput: "hello world", failureMessage: "", reasoningSummary: null },
+    { rawOutput: "hello world", failureMessage: "", telemetry: null },
     { title: "Claude Task", jobId: "task-abc", write: true }
   );
   assert.match(out, /# Claude Task \(task-abc\)/);
   assert.match(out, /write-capable run/);
   assert.match(out, /hello world/);
+});
+
+test("renderTaskResult appends telemetry footer when present", () => {
+  const out = renderTaskResult(
+    {
+      rawOutput: "ok",
+      failureMessage: "",
+      telemetry: {
+        durationMs: 2935,
+        totalCostUsd: 0.2034,
+        inputTokens: 5,
+        outputTokens: 15,
+        cacheReadTokens: 18535,
+        numTurns: 1,
+        modelsUsed: ["claude-opus-4-7"],
+        permissionDenials: []
+      }
+    },
+    { title: "Claude Task", jobId: "task-1", write: false }
+  );
+  assert.match(out, /duration 2\.9s/);
+  assert.match(out, /cost \$0\.2034/);
+  assert.match(out, /tokens in\/out 5\/15/);
+  assert.match(out, /cache-read 18\.5k/);
+  assert.match(out, /claude-opus-4-7/);
+});
+
+test("renderTelemetryFooter returns null when nothing useful is present", () => {
+  assert.equal(renderTelemetryFooter(null), null);
+  assert.equal(renderTelemetryFooter({}), null);
+});
+
+test("renderTelemetryFooter highlights api errors and permission denials", () => {
+  const footer = renderTelemetryFooter({
+    durationMs: 1000,
+    apiErrorStatus: "overloaded",
+    permissionDenials: [{ tool: "Bash" }]
+  });
+  assert.match(footer, /api-error overloaded/);
+  assert.match(footer, /permission-denials 1/);
 });
 
 test("renderReviewResult renders parsed summary and findings", () => {
@@ -44,7 +85,7 @@ test("renderReviewResult renders parsed summary and findings", () => {
       rawOutput: "",
       parseError: null
     },
-    { reviewLabel: "Adversarial Review", targetLabel: "branch", reasoningSummary: null }
+    { reviewLabel: "Adversarial Review", targetLabel: "branch", telemetry: null }
   );
   assert.match(out, /Adversarial Review/);
   assert.match(out, /looks risky/);
@@ -54,7 +95,7 @@ test("renderReviewResult renders parsed summary and findings", () => {
 test("renderNativeReviewResult falls back to stderr on no stdout", () => {
   const out = renderNativeReviewResult(
     { status: 1, stdout: "", stderr: "boom" },
-    { reviewLabel: "Review", targetLabel: "working tree", reasoningSummary: null }
+    { reviewLabel: "Review", targetLabel: "working tree", telemetry: null }
   );
   assert.match(out, /Failure: boom/);
 });

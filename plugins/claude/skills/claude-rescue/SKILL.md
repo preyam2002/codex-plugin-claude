@@ -20,7 +20,11 @@ Strip these from the task text before forwarding:
 - `--background` / `--wait` — execution mode flags. Default to foreground when neither is given.
 - `--resume` / `--fresh` — thread routing. If neither is given, run the resume helper first (see below).
 - `--write` / `--read-only` — sandbox flags. Default to `--write` unless the user explicitly asks for read-only / diagnosis-only / review-only.
-- `--model <name>` — model selection. Pass through verbatim.
+- `--model <name>` — model selection. Pass through verbatim (e.g. `sonnet`, `opus`, `claude-sonnet-4-6`).
+- `--effort <level>` — reasoning effort: `low`, `medium`, `high`, `xhigh`, `max`. Pass through verbatim.
+- `--max-budget-usd <amount>` — hard dollar cap for this invocation. Pass through verbatim.
+- `--fork-session` — when used with `--resume`, create a new session ID instead of overwriting the original thread.
+- `--allowed-tools <list>` / `--disallowed-tools <list>` — comma-separated tool gating (e.g. `Bash,Edit` or `Bash(git *)`). Pass through verbatim.
 
 ## Resume check
 

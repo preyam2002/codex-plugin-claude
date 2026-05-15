@@ -13,6 +13,67 @@ function renderProgressPreview(lines) {
   return ["  Progress:", ...lines.map((line) => `    ${line}`)].join("\n");
 }
 
+function formatDuration(ms) {
+  if (typeof ms !== "number" || !Number.isFinite(ms) || ms < 0) return null;
+  if (ms < 1000) return `${ms}ms`;
+  const seconds = ms / 1000;
+  if (seconds < 60) return `${seconds.toFixed(1)}s`;
+  const minutes = Math.floor(seconds / 60);
+  const remSeconds = Math.round(seconds - minutes * 60);
+  return `${minutes}m${remSeconds}s`;
+}
+
+function formatCost(amount) {
+  if (typeof amount !== "number" || !Number.isFinite(amount)) return null;
+  if (amount === 0) return "$0.00";
+  if (amount < 0.01) return `$${amount.toFixed(4)}`;
+  return `$${amount.toFixed(4)}`;
+}
+
+function formatTokens(value) {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return null;
+  if (value < 1000) return String(value);
+  if (value < 1_000_000) return `${(value / 1000).toFixed(1)}k`;
+  return `${(value / 1_000_000).toFixed(2)}M`;
+}
+
+export function renderTelemetryFooter(telemetry) {
+  if (!telemetry) return null;
+  const bits = [];
+  const duration = formatDuration(telemetry.durationMs);
+  if (duration) bits.push(`duration ${duration}`);
+  const cost = formatCost(telemetry.totalCostUsd);
+  if (cost) bits.push(`cost ${cost}`);
+  const inputTokens = formatTokens(telemetry.inputTokens);
+  const outputTokens = formatTokens(telemetry.outputTokens);
+  if (inputTokens != null || outputTokens != null) {
+    bits.push(`tokens in/out ${inputTokens ?? "?"}/${outputTokens ?? "?"}`);
+  }
+  const cacheRead = formatTokens(telemetry.cacheReadTokens);
+  if (cacheRead != null && telemetry.cacheReadTokens > 0) {
+    bits.push(`cache-read ${cacheRead}`);
+  }
+  if (telemetry.numTurns != null && telemetry.numTurns > 1) {
+    bits.push(`turns ${telemetry.numTurns}`);
+  }
+  if (Array.isArray(telemetry.modelsUsed) && telemetry.modelsUsed.length) {
+    bits.push(`model ${telemetry.modelsUsed.join(", ")}`);
+  }
+  const denials = Array.isArray(telemetry.permissionDenials) ? telemetry.permissionDenials.length : 0;
+  if (denials) bits.push(`permission-denials ${denials}`);
+  if (telemetry.apiErrorStatus) bits.push(`api-error ${telemetry.apiErrorStatus}`);
+  if (!bits.length) return null;
+  return `_${bits.join(" · ")}_`;
+}
+
+function appendTelemetry(lines, telemetry) {
+  const footer = renderTelemetryFooter(telemetry);
+  if (footer) {
+    lines.push("");
+    lines.push(footer);
+  }
+}
+
 export function renderSetupReport(report) {
   const lines = [];
   lines.push(report.ready ? "Claude is ready." : "Claude is not ready.");
@@ -41,15 +102,11 @@ export function renderTaskResult(parts, meta) {
   if (parts.rawOutput?.trim()) {
     lines.push(parts.rawOutput.trim());
   } else if (parts.failureMessage) {
-    lines.push(`Failure: ${parts.failureMessage.trim()}`);
+    lines.push(`Failure: ${String(parts.failureMessage).trim()}`);
   } else {
     lines.push("(no output)");
   }
-  if (parts.reasoningSummary) {
-    lines.push("");
-    lines.push("## Reasoning summary");
-    lines.push(parts.reasoningSummary.trim());
-  }
+  appendTelemetry(lines, parts.telemetry);
   return `${lines.join("\n")}\n`;
 }
 
@@ -77,11 +134,7 @@ export function renderReviewResult(parsed, meta) {
   } else if (parsed.parseError) {
     lines.push(`Parse error: ${parsed.parseError}`);
   }
-  if (meta.reasoningSummary) {
-    lines.push("");
-    lines.push("## Reasoning summary");
-    lines.push(meta.reasoningSummary.trim());
-  }
+  appendTelemetry(lines, meta.telemetry);
   return `${lines.join("\n")}\n`;
 }
 
@@ -97,11 +150,7 @@ export function renderNativeReviewResult(result, meta) {
   } else {
     lines.push("(no output)");
   }
-  if (meta.reasoningSummary) {
-    lines.push("");
-    lines.push("## Reasoning summary");
-    lines.push(meta.reasoningSummary.trim());
-  }
+  appendTelemetry(lines, meta.telemetry);
   return `${lines.join("\n")}\n`;
 }
 
@@ -138,6 +187,10 @@ export function renderJobStatusReport(job) {
   if (preview) lines.push(preview);
   if (job.errorMessage) lines.push(`  Error: ${job.errorMessage}`);
   if (job.threadId) lines.push(`  Thread: ${job.threadId}`);
+  if (job.telemetry) {
+    const footer = renderTelemetryFooter(job.telemetry);
+    if (footer) lines.push(`  ${footer}`);
+  }
   return `${lines.join("\n")}\n`;
 }
 
