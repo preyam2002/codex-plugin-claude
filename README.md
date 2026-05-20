@@ -17,6 +17,16 @@ This plugin is for Codex users who want an easy way to start using Claude from t
 - **Node.js 18.18 or later**
 - **Claude CLI** (`claude --version` should print a version)
 
+## Environment variables
+
+All optional — the plugin works with zero configuration.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `ANTHROPIC_API_KEY` | unset | If set, the underlying `claude` CLI uses it for auth (overrides interactive login). |
+| `CLAUDE_BIN` | `claude` | Path/name of the Claude CLI binary to invoke. Override if `claude` is not on `PATH`. |
+| `CODEX_PLUGIN_DATA` | OS temp dir | Root directory for job state. Each workspace gets `<CODEX_PLUGIN_DATA>/state/<workspace>-<hash>/`. |
+
 ## Install
 
 ```bash

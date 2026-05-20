@@ -203,7 +203,7 @@ function buildPlainReviewPrompt(context) {
 function ensureClaudeAvailable(cwd) {
   const availability = getClaudeAvailability(cwd);
   if (!availability.available) {
-    throw new Error("Claude CLI is not installed. Install it with `npm install -g @anthropic-ai/claude-code`, then rerun `/claude:setup`.");
+    throw new Error("Claude CLI is not installed. Install it with `npm install -g @anthropic-ai/claude-code`, then ask \"is Claude set up?\".");
   }
 }
 
@@ -256,7 +256,7 @@ async function resolveLatestTrackedTaskThread(cwd, options = {}) {
   const visibleJobs = filterJobsForCurrentSession(jobs);
   const activeTask = visibleJobs.find((job) => job.jobClass === "task" && (job.status === "queued" || job.status === "running"));
   if (activeTask) {
-    throw new Error(`Task ${activeTask.id} is still running. Use /claude:status before continuing it.`);
+    throw new Error(`Task ${activeTask.id} is still running. Ask "show Claude jobs" before continuing it.`);
   }
   const trackedTask = findLatestResumableTaskJob(visibleJobs);
   if (trackedTask) return { id: trackedTask.threadId };
@@ -421,7 +421,7 @@ function buildTaskRunMetadata({ prompt, resumeLast = false }) {
 }
 
 function renderQueuedTaskLaunch(payload) {
-  return `${payload.title} started in the background as ${payload.jobId}. Check /claude:status ${payload.jobId} for progress.\n`;
+  return `${payload.title} started in the background as ${payload.jobId}. Ask "what's the status of Claude job ${payload.jobId}?" for progress.\n`;
 }
 
 function getJobKindLabel(kind, jobClass) {
